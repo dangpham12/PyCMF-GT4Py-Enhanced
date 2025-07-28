@@ -5,7 +5,7 @@ import gt4py.cartesian.gtscript as gtscript
 import gt4py.storage as gt_storage
 
 
-class EarthBase():
+class EarthBase:
     """
     First layer of the earth model.
     The Python implementation of the Earth class to deal with the dunder method, index access, etc...

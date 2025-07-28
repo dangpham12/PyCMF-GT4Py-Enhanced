@@ -4,6 +4,10 @@ import src.constants as constants
 
 
 import numpy as np
+import jax.numpy as jnp
+from jax import vmap
+from functools import partial
+
 from gt4py.cartesian import gtscript
 from gt4py.cartesian.gtscript import PARALLEL, BACKWARD, computation, interval, IJ, IJK, Field
 import gt4py.storage as gt_storage
