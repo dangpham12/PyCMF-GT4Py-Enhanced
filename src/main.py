@@ -41,7 +41,7 @@ def final_plot():
 
 if __name__ == "__main__":
     backend = "gt:gpu"
-    grid_shape = (100, 100, 80)
+    grid_shape = (50, 50, 80)
     nb_steps = 50
     iter_steps = np.zeros(nb_steps, dtype=float)
 

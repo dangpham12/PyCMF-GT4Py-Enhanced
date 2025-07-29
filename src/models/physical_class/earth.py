@@ -10,8 +10,7 @@ from src.constants import DTYPE_ACCURACY
 
 Field3D = gtscript.Field[DTYPE_ACCURACY]
 backend_opts = dict(
-    disable_checks=True,   # Disable argument validation for inputs/outputs
-    device_sync=False  # Disable device synchronization for performance
+    device_sync=False  # Only available for GPU backends
 )
 
 class Earth(EarthBase, CelestialBody):
