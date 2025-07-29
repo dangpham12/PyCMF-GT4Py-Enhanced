@@ -1,12 +1,18 @@
 import math
-
+import numpy as np
 from gt4py.cartesian import gtscript
 from gt4py.cartesian.gtscript import PARALLEL, BACKWARD, computation, interval, horizontal, region, I, J, K, IJ, IJK, Field
 import gt4py.storage as gt_storage
 
+from src.constants import DTYPE_ACCURACY
 from src.models.ABC.ticking_model import TickingModel
 from src.models.physical_class.earth import Earth
 
+Field3D = gtscript.Field[DTYPE_ACCURACY]
+backend_opts = dict(
+    disable_checks=True,   # Disable argument validation for inputs/outputs
+    device_sync=False  # Disable device synchronization for performance
+)
 
 class TickingEarth(Earth, TickingModel):
     """
@@ -22,12 +28,12 @@ class TickingEarth(Earth, TickingModel):
         self.evaporation_rate = self.get_universe().EVAPORATION_RATE
 
         @gtscript.function
-        def temp_coefficient(heat_transfer_coefficient: gtscript.Field[float],
-                             specific_heat_capacity: gtscript.Field[float]):
+        def temp_coefficient(heat_transfer_coefficient: Field3D,
+                             specific_heat_capacity: Field3D):
             return heat_transfer_coefficient[0,0,0] * specific_heat_capacity[0,0,0] * self.time_delta
         
 
-        def compute_energy_transfer(in_field: gtscript.Field[float], energy: gtscript.Field[float], heat_transfer_coefficient: gtscript.Field[float], specific_heat_capacity: gtscript.Field[float]):
+        def compute_energy_transfer(in_field: Field3D, energy: Field3D, heat_transfer_coefficient: Field3D, specific_heat_capacity: Field3D):
             """
             compute the energy transfer between the grid chunk and its neighbors
             :param grid_chunk:
@@ -43,7 +49,7 @@ class TickingEarth(Earth, TickingModel):
                 energy += (in_field[0, 0, -1] - in_field[0, 0, 0]) * coeff
 
 
-        def water_evaporation(water_mass: gtscript.Field[float], air_mass: gtscript.Field[float]):
+        def water_evaporation(water_mass: Field3D, air_mass: Field3D):
             """
             Evaporate water from the water component of the grid chunk
             :param grid_chunk:
@@ -54,7 +60,7 @@ class TickingEarth(Earth, TickingModel):
                 water_mass -= evaporated_mass
                 air_mass += evaporated_mass
 
-        def carbon_cycle(carbon_ppm: gtscript.Field[float], carbon_per_chunk: float):
+        def carbon_cycle(carbon_ppm: Field3D, carbon_per_chunk: DTYPE_ACCURACY):
             """
             Globally computes carbon flow to be applied to each grid chunk
             :return:
@@ -63,9 +69,9 @@ class TickingEarth(Earth, TickingModel):
                 carbon_ppm += carbon_per_chunk
 
 
-        self._water_evaporation = gtscript.stencil(definition=water_evaporation, backend=self.backend)
-        self._compute_energy_transfer = gtscript.stencil(definition=compute_energy_transfer, backend=self.backend)
-        self._carbon_cycle = gtscript.stencil(definition=carbon_cycle, backend=self.backend)
+        self._water_evaporation = gtscript.stencil(definition=water_evaporation, backend=self.backend, **backend_opts)
+        self._compute_energy_transfer = gtscript.stencil(definition=compute_energy_transfer, backend=self.backend, **backend_opts)
+        self._carbon_cycle = gtscript.stencil(definition=carbon_cycle, backend=self.backend, **backend_opts)
 
     def update(self):
         """
@@ -83,7 +89,7 @@ class TickingEarth(Earth, TickingModel):
         :return:
         """
         self._compute_chunk_temperature(self.water_energy, self.water_mass, self.air_energy, self.air_mass, self.land_energy, self.land_mass, self.chunk_temp)
-        temp_energy = gt_storage.zeros(self.shape, dtype=float, backend=self.backend)
+        temp_energy = gt_storage.zeros(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._compute_energy_transfer(self.chunk_temp, temp_energy, self.heat_transfer_coefficient, self.specific_heat_capacity, origin=self.origin)
         self._add_energy(temp_energy, self.water_energy, self.water_mass, self.air_energy, self.air_mass, self.land_energy, self.land_mass)
 

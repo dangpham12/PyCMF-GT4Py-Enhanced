@@ -1,6 +1,8 @@
 import math
+import numpy as np
 from typing import TYPE_CHECKING
 
+from src.constants import DTYPE_ACCURACY
 from src.models.ABC.ticking_model import TickingModel
 from src.models.physical_class.sun import Sun
 
@@ -19,8 +21,8 @@ class Universe(UniverseBase, TickingModel):
 
     The universe does not contain itself.
     """
-    TIME_DELTA: float = 0.01
-    EVAPORATION_RATE: float = 0.0001
+    TIME_DELTA: np.float16 = 0.01
+    EVAPORATION_RATE: np.float16 = 0.0001
 
     def __init__(self):
         super().__init__()
@@ -49,7 +51,7 @@ class Universe(UniverseBase, TickingModel):
         return self.earth.get_component_at(x, y, z)
 
     @staticmethod
-    def radiate_inside(energy_radiation_per_time_delta: float, *, source: "CelestialBody"):
+    def radiate_inside(energy_radiation_per_time_delta: DTYPE_ACCURACY, *, source: "CelestialBody"):
         for celestial_body in source.objects_in_line_of_sight:
             solid_angle = source.solid_angle(celestial_body)
             celestial_body.receive_radiation(energy_radiation_per_time_delta * solid_angle / (4 * math.pi))

@@ -1,5 +1,8 @@
+import numpy as np
+
 CANVAS_SIZE = (400, 400)
 ICON_SIZE = (16, 16)
+DTYPE_ACCURACY = np.float32
 
 COMPONENTS = ["WATER", "AIR", "LAND"]  # Here and not in the model universe because it is required by the GUI and the model
 
@@ -17,7 +20,7 @@ AIR_HEAT_CAPACITY = 1012
 ARGON_HEAT_CAPACITY = 520.3
 NITROGEN_HEAT_CAPACITY = 1040
 OXYGEN_HEAT_CAPACITY = 918
-LAND_HEAT_CAPACITY = 830  
+LAND_HEAT_CAPACITY = 830
 
 HEAT_TRANSFER_COEFFICIENT = {  # [W m^-2 K^-1]
     "WATER": 1000,

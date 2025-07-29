@@ -1,20 +1,18 @@
-from src.models.ABC.celestial_body import CelestialBody
-from src.models.base_class.earth_base import EarthBase
-import src.constants as constants
-
-
 import numpy as np
-import jax.numpy as jnp
-from jax import vmap
-from functools import partial
-
 from gt4py.cartesian import gtscript
 from gt4py.cartesian.gtscript import PARALLEL, BACKWARD, computation, interval, IJ, IJK, Field
 import gt4py.storage as gt_storage
-import typing
 
-Field3D = gtscript.Field[np.float64]
+from src.models.ABC.celestial_body import CelestialBody
+from src.models.base_class.earth_base import EarthBase
+import src.constants as constants
+from src.constants import DTYPE_ACCURACY
 
+Field3D = gtscript.Field[DTYPE_ACCURACY]
+backend_opts = dict(
+    disable_checks=True,   # Disable argument validation for inputs/outputs
+    device_sync=False  # Disable device synchronization for performance
+)
 
 class Earth(EarthBase, CelestialBody):
     """
@@ -22,7 +20,7 @@ class Earth(EarthBase, CelestialBody):
     In this layer are all the physical properties and functions of the Earth implemented. It is here that we will add
     new model variables
     """
-    albedo: float = 0.3
+    albedo: np.float16 = 0.3
     CARBON_EMISSIONS_PER_TIME_DELTA: float = 1_000_000  # ppm
     backend: str
 
@@ -38,43 +36,43 @@ class Earth(EarthBase, CelestialBody):
         
 
         @gtscript.function
-        def component_ratio(component_mass: gtscript.Field[float], chunk_mass: gtscript.Field[float]) -> float:
+        def component_ratio(component_mass: Field3D, chunk_mass: Field3D) -> DTYPE_ACCURACY:
             return component_mass[0, 0, 0] / chunk_mass[0, 0, 0]
         
-        def compute_heat_transfer_coefficient(water_mass: gtscript.Field[float], 
-                                              air_mass: gtscript.Field[float], 
-                                              land_mass: gtscript.Field[float], 
-                                              chunk_mass: gtscript.Field[float],
-                                              heat_transfer_coefficient: gtscript.Field[float]):
+        def compute_heat_transfer_coefficient(water_mass: Field3D, 
+                                              air_mass: Field3D, 
+                                              land_mass: Field3D, 
+                                              chunk_mass: Field3D,
+                                              heat_transfer_coefficient: Field3D):
             with computation(PARALLEL), interval(...):
                 heat_transfer_coefficient = component_ratio(water_mass, chunk_mass) * constants.WATER_HEAT_TRANSFER_COEFFICIENT + \
                                              component_ratio(air_mass, chunk_mass) * constants.AIR_HEAT_TRANSFER_COEFFICIENT + \
                                                 component_ratio(land_mass, chunk_mass) * constants.LAND_HEAT_TRANSFER_COEFFICIENT
         
-        def compute_specific_heat_capacity(water_mass: gtscript.Field[float], 
-                                              air_mass: gtscript.Field[float], 
-                                              land_mass: gtscript.Field[float], 
-                                              chunk_mass: gtscript.Field[float],
-                                              specific_heat_capacity: gtscript.Field[float]):
+        def compute_specific_heat_capacity(water_mass: Field3D, 
+                                              air_mass: Field3D, 
+                                              land_mass: Field3D, 
+                                              chunk_mass: Field3D,
+                                              specific_heat_capacity: Field3D):
             with computation(PARALLEL), interval(...):
                 specific_heat_capacity = component_ratio(water_mass, chunk_mass) * constants.WATER_HEAT_CAPACITY + \
                                              component_ratio(air_mass, chunk_mass) * constants.AIR_HEAT_CAPACITY + \
                                                 component_ratio(land_mass, chunk_mass) * constants.LAND_HEAT_CAPACITY
                 
-        def compute_chunk_composition(water_mass: gtscript.Field[float], 
-                                      air_mass: gtscript.Field[float], 
-                                      land_mass: gtscript.Field[float], 
-                                      chunk_mass: gtscript.Field[float],
-                                      water_composition: gtscript.Field[float],
-                                      air_composition: gtscript.Field[float],
-                                      land_composition: gtscript.Field[float]):
+        def compute_chunk_composition(water_mass: Field3D, 
+                                      air_mass: Field3D, 
+                                      land_mass: Field3D, 
+                                      chunk_mass: Field3D,
+                                      water_composition: Field3D,
+                                      air_composition: Field3D,
+                                      land_composition: Field3D):
             with computation(PARALLEL), interval(...):
                 water_composition = component_ratio(water_mass, chunk_mass)
                 air_composition = component_ratio(air_mass, chunk_mass)
                 land_composition = component_ratio(land_mass, chunk_mass)
 
         @gtscript.function
-        def temperature_to_energy(temperature: gtscript.Field[float], mass: gtscript.Field[float]) -> float:
+        def temperature_to_energy(temperature: Field3D, mass: Field3D) -> DTYPE_ACCURACY:
             """
             Set the temperature of the component by computing the energy from the mass and the temperature
             Water specific is our case (as it is only used to generate a full of water earth)
@@ -83,18 +81,18 @@ class Earth(EarthBase, CelestialBody):
             """
             return temperature[0, 0, 0] * mass[0, 0, 0] * constants.WATER_HEAT_CAPACITY
         
-        def temperature_to_energy_field(temperature: gtscript.Field[float], mass: gtscript.Field[float], energy: gtscript.Field[float]):
+        def temperature_to_energy_field(temperature: Field3D, mass: Field3D, energy: Field3D):
             with computation(PARALLEL), interval(...):
                 energy = temperature_to_energy(temperature=temperature, mass=mass)
             
 
         @gtscript.function
-        def chunk_temperature(water_energy: gtscript.Field[float], 
-            water_mass: gtscript.Field[float],
-            air_energy: gtscript.Field[float], 
-            air_mass: gtscript.Field[float], 
-            land_energy: gtscript.Field[float], 
-            land_mass: gtscript.Field[float]) -> float:
+        def chunk_temperature(water_energy: Field3D, 
+            water_mass: Field3D,
+            air_energy: Field3D, 
+            air_mass: Field3D, 
+            land_energy: Field3D, 
+            land_mass: Field3D) -> DTYPE_ACCURACY:
             temp = 0.0
             nb_components = 0
             if water_mass[0, 0, 0] != 0:
@@ -108,26 +106,26 @@ class Earth(EarthBase, CelestialBody):
                 nb_components += 1
             return temp / nb_components
 
-        def compute_chunk_temperature(water_energy: gtscript.Field[float], 
-                                        water_mass: gtscript.Field[float], 
-                                        air_energy: gtscript.Field[float], 
-                                        air_mass: gtscript.Field[float], 
-                                        land_energy: gtscript.Field[float], 
-                                        land_mass: gtscript.Field[float],
-                                        temperature: gtscript.Field[float]) -> float:
+        def compute_chunk_temperature(water_energy: Field3D, 
+                                        water_mass: Field3D, 
+                                        air_energy: Field3D, 
+                                        air_mass: Field3D, 
+                                        land_energy: Field3D, 
+                                        land_mass: Field3D,
+                                        temperature: Field3D) -> DTYPE_ACCURACY:
             with computation(PARALLEL), interval(...):
                 temperature = chunk_temperature(water_energy=water_energy, water_mass=water_mass, air_energy=air_energy, air_mass=air_mass, land_energy=land_energy, land_mass=land_mass)
 
-        def compute_chunk_mass(water_mass: gtscript.Field[float],
-                                air_mass: gtscript.Field[float], 
-                                land_mass: gtscript.Field[float],
-                                chunk_mass: gtscript.Field[float]) -> float:
+        def compute_chunk_mass(water_mass: Field3D,
+                                air_mass: Field3D, 
+                                land_mass: Field3D,
+                                chunk_mass: Field3D) -> DTYPE_ACCURACY:
             with computation(PARALLEL), interval(...):
                 chunk_mass = water_mass[0, 0, 0] + air_mass[0, 0, 0] + land_mass[0, 0, 0]
 
 
-        def sum_vertical_values(in_field: gtscript.Field[float],
-                           out_field: gtscript.Field[float]):
+        def sum_vertical_values(in_field: Field3D,
+                           out_field: Field3D):
             """
             Sum all the values of the input field on K dimensions and put the result in the output field at [I, J, 0]
             :param in_field:
@@ -140,13 +138,13 @@ class Earth(EarthBase, CelestialBody):
                 out_field += out_field[0, 0, 1] # Then add the next element to the previous one
         
 
-        def add_energy(input_energy: gtscript.Field[float],
-                       water_energy: gtscript.Field[float], 
-                       water_mass: gtscript.Field[float], 
-                       air_energy: gtscript.Field[float], 
-                       air_mass: gtscript.Field[float], 
-                       land_energy: gtscript.Field[float], 
-                       land_mass: gtscript.Field[float]):
+        def add_energy(input_energy: Field3D,
+                       water_energy: Field3D, 
+                       water_mass: Field3D, 
+                       air_energy: Field3D, 
+                       air_mass: Field3D, 
+                       land_energy: Field3D, 
+                       land_mass: Field3D):
             """
             Distribute a same amount of energy on all the chunk of the earth
             """
@@ -159,18 +157,18 @@ class Earth(EarthBase, CelestialBody):
                 if land_mass[0, 0, 0] != 0:
                     land_energy[0, 0, 0] += input_energy * (land_mass[0, 0, 0]/chunk_mass)
 
-        self._add_energy = gtscript.stencil(definition=add_energy, backend=self.backend)
-        self._compute_chunk_mass = gtscript.stencil(definition=compute_chunk_mass, backend=self.backend)
-        self._compute_chunk_temperature = gtscript.stencil(definition=compute_chunk_temperature, backend=self.backend)
-        self._sum_vertical_values = gtscript.stencil(definition=sum_vertical_values, backend=self.backend)
-        self._temperature_to_energy_field = gtscript.stencil(definition=temperature_to_energy_field, backend=self.backend)
-        self._compute_heat_transfer_coefficient = gtscript.stencil(definition=compute_heat_transfer_coefficient, backend=self.backend)
-        self._compute_chunk_composition = gtscript.stencil(definition=compute_chunk_composition, backend=self.backend)
-        self._compute_specific_heat_capacity = gtscript.stencil(definition=compute_specific_heat_capacity, backend=self.backend)
+        self._add_energy = gtscript.stencil(definition=add_energy, backend=self.backend, **backend_opts)
+        self._compute_chunk_mass = gtscript.stencil(definition=compute_chunk_mass, backend=self.backend, **backend_opts)
+        self._compute_chunk_temperature = gtscript.stencil(definition=compute_chunk_temperature, backend=self.backend, **backend_opts)
+        self._sum_vertical_values = gtscript.stencil(definition=sum_vertical_values, backend=self.backend, **backend_opts)
+        self._temperature_to_energy_field = gtscript.stencil(definition=temperature_to_energy_field, backend=self.backend, **backend_opts)
+        self._compute_heat_transfer_coefficient = gtscript.stencil(definition=compute_heat_transfer_coefficient, backend=self.backend, **backend_opts)
+        self._compute_chunk_composition = gtscript.stencil(definition=compute_chunk_composition, backend=self.backend, **backend_opts)
+        self._compute_specific_heat_capacity = gtscript.stencil(definition=compute_specific_heat_capacity, backend=self.backend, **backend_opts)
 
 
 
-    def sum_horizontal_values(self, field: gtscript.Field[float]):
+    def sum_horizontal_values(self, field: Field3D):
         """
         Sum all the values of the input field on K = 0 level
         :param in_field:
@@ -180,10 +178,10 @@ class Earth(EarthBase, CelestialBody):
         return np.sum(field[:, :, 0])
 
     @property
-    def average_temperature(self) -> float:
+    def average_temperature(self) -> DTYPE_ACCURACY:
         print("Computing average temperature")
         self._compute_chunk_temperature(self.water_energy, self.water_mass, self.air_energy, self.air_mass, self.land_energy, self.land_mass, self.chunk_temp)
-        temp_total_temperature = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
+        temp_total_temperature = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._sum_vertical_values(self.chunk_temp, temp_total_temperature)
         self._average_temperature = self.sum_horizontal_values(temp_total_temperature) / len(self)
         
@@ -192,19 +190,19 @@ class Earth(EarthBase, CelestialBody):
         
 
     @property
-    def total_mass(self) -> float:
+    def total_mass(self) -> DTYPE_ACCURACY:
         self._compute_chunk_mass(self.water_mass, self.air_mass, self.land_mass, self.chunk_mass)
-        temp_total_mass = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
+        temp_total_mass = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._sum_vertical_values(self.chunk_mass, temp_total_mass)
         self._total_mass = self.sum_horizontal_values(temp_total_mass)
         print("Computing total mass")
         return self._total_mass
     
     @property
-    def total_energy(self) -> float:
-        temp_total_energy = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
+    def total_energy(self) -> DTYPE_ACCURACY:
+        temp_total_energy = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._compute_chunk_mass(self.water_energy, self.air_energy, self.land_energy, temp_total_energy)
-        temp_sum_energy = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
+        temp_sum_energy = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._sum_vertical_values(temp_total_energy, temp_sum_energy)
         return self.sum_horizontal_values(temp_sum_energy)
 
@@ -213,9 +211,9 @@ class Earth(EarthBase, CelestialBody):
     def composition(self):
         composition_mass_dict = dict()
         self._compute_chunk_mass(self.water_mass, self.air_mass, self.land_mass, self.chunk_mass) # If not already computed
-        water_composition = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
-        air_composition = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
-        land_composition = gt_storage.empty(self.shape, dtype=float, backend=self.backend)
+        water_composition = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
+        air_composition = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
+        land_composition = gt_storage.empty(self.shape, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._compute_chunk_composition(self.water_mass, self.air_mass, self.land_mass, self.chunk_mass, water_composition, air_composition, land_composition)
         self._sum_vertical_values(water_composition, water_composition)
         self._sum_vertical_values(air_composition, air_composition)
@@ -259,7 +257,7 @@ class Earth(EarthBase, CelestialBody):
         return res
     
     
-    def energy_to_temperature(self, energy: float, mass: float, heat_capacity: float):
+    def energy_to_temperature(self, energy: DTYPE_ACCURACY, mass: DTYPE_ACCURACY, heat_capacity: DTYPE_ACCURACY):
         """
         Set the temperature of the component by computing the energy from the mass and the temperature
         :param temperature:
@@ -268,10 +266,10 @@ class Earth(EarthBase, CelestialBody):
         return energy / (mass * heat_capacity)
 
 
-    def receive_radiation(self, energy: float):
+    def receive_radiation(self, energy: DTYPE_ACCURACY):
         energy = energy * (1 - self.albedo)
         input_energy = energy/len(self)
-        input_energy_field = gt_storage.full(self.shape, input_energy, backend=self.backend)
+        input_energy_field = gt_storage.full(self.shape, input_energy, dtype=DTYPE_ACCURACY, backend=self.backend)
         self._add_energy(input_energy=input_energy_field, 
                           water_energy=self.water_energy,
                           water_mass=self.water_mass, 
@@ -285,8 +283,8 @@ class Earth(EarthBase, CelestialBody):
         Fill the earth with water
         :return:
         """
-        self.water_mass = gt_storage.from_array(np.full(shape=self.shape, fill_value=1000), backend=self.backend)
-        water_temp = gt_storage.from_array(np.random.uniform(290, 310, self.shape), backend=self.backend)
+        self.water_mass = gt_storage.from_array(np.full(shape=self.shape, fill_value=1000), dtype=DTYPE_ACCURACY, backend=self.backend)
+        water_temp = gt_storage.from_array(np.random.uniform(290, 310, self.shape), dtype=DTYPE_ACCURACY, backend=self.backend)
         self._temperature_to_energy_field(water_temp, self.water_mass, self.water_energy)
 
         self._compute_chunk_mass(self.water_mass, self.air_mass, self.land_mass, self.chunk_mass)
