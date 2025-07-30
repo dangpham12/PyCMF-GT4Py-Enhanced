@@ -58,6 +58,7 @@ Devito is a domain-specific language (DSL) for writing high-performance finite d
 ### Cuda PYthon
 Cuda Python is a Python interface for NVIDIA's CUDA (Compute Unified Device Architecture) platform, allowing users to write high-performance GPU code in Python. It provides a way to leverage the parallel processing capabilities of NVIDIA GPUs for general-purpose computing tasks.
 Fully integrated with python recently
++ Numba compiler
 
 ### ICON4Py
 ICON4Py is a Python interface for the ICON (ICOsahedral Nonhydrostatic) model, which is a numerical weather prediction and climate model developed by the Max Planck Institute for Meteorology. ICON4Py provides a way to interact with the ICON model using Python, enabling users to perform simulations, analyze results, and visualize data.
