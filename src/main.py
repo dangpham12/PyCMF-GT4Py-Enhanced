@@ -47,24 +47,30 @@ def simulation(grid_shape, nb_steps, backend="numpy"):
     return elapsed, mean
 
 if __name__ == "__main__":
-    # backend = "gt:gpu"
-    backends = ("numpy", "gt:cpu_ifirst", 'gt:cpu_kfirst',"gt:gpu", "dace:cpu", "dace:gpu", "cuda")
+    backend = "numpy"  # Change this to the desired backend
     grid_shape = (50, 50, 80)
     nb_steps = 50
 
     data= {}
-    for backend in backends:
-        data_run = []
-        for run in range (2):
-            elapsed, mean = simulation(grid_shape, nb_steps, backend)
-            data_run.append((elapsed, mean))
+    elapsed, mean = simulation(grid_shape, nb_steps, backend)
 
-        data[backend] = {"run_1": { "total": data_run[0][0], "mean": data_run[0][1]},
-                         "run_2": { "total": data_run[1][0], "mean": data_run[1][1]}}
-        if os.path.isdir(".gt_cache"):
-            shutil.rmtree(".gt_cache")
-        if os.path.isdir(".dacecache"):
-            shutil.rmtree(".dacecache")
+    data[backend] = { "total": elapsed, "mean": mean}
 
-    with open(f"{grid_shape[0]}_{DTYPE_ACCURACY}.json", "w") as f:
-        json.dump(data, f, indent=4)
+    if os.path.isdir(".gt_cache"):
+        shutil.rmtree(".gt_cache")
+    if os.path.isdir(".dacecache"):
+        shutil.rmtree(".dacecache")
+
+    path= f"{grid_shape[0]}_{DTYPE_ACCURACY}.json"
+    if not os.path.isfile(path):
+        with open(path, "w") as f:
+            json.dump({}, f, indent=4)
+
+    with open(path, "r") as f:
+        data_f = json.load(f)
+        data_f[backend] = data[backend]
+
+    with open(path, "w") as f:
+        json.dump(data_f, f, indent=4)
+
+    os.system('say "finished"')
