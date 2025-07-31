@@ -12,5 +12,6 @@
 - GT4PY JAX ICON4PY etc (**Notes.md**)
 - Old memorants
 - Discuss results
+- cant find validate arguments
 - Give ccl
 - Give hints to work

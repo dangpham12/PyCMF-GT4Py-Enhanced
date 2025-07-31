@@ -1,4 +1,4 @@
-import os, json, shutil
+import os, json, shutil, re
 import numpy as np
 import time
 from tqdm import trange
@@ -47,9 +47,12 @@ def simulation(grid_shape, nb_steps, backend="numpy"):
     return elapsed, mean
 
 if __name__ == "__main__":
-    backend = "numpy"  # Change this to the desired backend
-    grid_shape = (50, 50, 80)
+    backend = "dace:gpu"  # Change this to the desired backend
+    grid_shape = (400, 400, 80)
     nb_steps = 50
+
+    strip_word = re.search(r"\.(\w+)'", str(DTYPE_ACCURACY))
+    dtype = strip_word.group(1)
 
     data= {}
     elapsed, mean = simulation(grid_shape, nb_steps, backend)
@@ -61,7 +64,7 @@ if __name__ == "__main__":
     if os.path.isdir(".dacecache"):
         shutil.rmtree(".dacecache")
 
-    path= f"{grid_shape[0]}_{DTYPE_ACCURACY}.json"
+    path= f"{grid_shape[0]}_{dtype}_devicesync.json"
     if not os.path.isfile(path):
         with open(path, "w") as f:
             json.dump({}, f, indent=4)
