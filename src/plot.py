@@ -7,7 +7,9 @@ def get_data(shape, type):
     with open(path, "r") as f:
         data = json.load(f)
 
-    backends = data.keys()
+    desired_backends = ["gt:cpu_ifirst","gt:cpu_kfirst", "gt:gpu", "dace:cpu", "dace:gpu", "cuda"]
+    backends = [backend for backend in data.keys() if backend in desired_backends]
+    # backends = data.keys()
     times = [data[backend]["total"] for backend in backends]
     mean_times = [data[backend]["mean"] for backend in backends]
     return backends, times, mean_times
@@ -41,22 +43,21 @@ if __name__ == "__main__":
     data_type = ["float64", "float32"]
     colors = ["red", "blue", "green", "orange", "purple", "brown", "pink", "gray"]
 
-    backends, times, mean_times = get_data(canvas[0], data_type[1])
+    backends, times, mean_times = get_data(canvas[1], data_type[0])
     backends2, times2, mean_times2 = get_data(canvas[1], data_type[1])
-    backend_jax, shapes_jax, time_jax, time2_jax, mean_time_jax, mean_time2_jax = get_data_jax(canvas[0])
+    # backend_jax, shapes_jax, time_jax, time2_jax, mean_time_jax, mean_time2_jax = get_data_jax(canvas[0])
     bar_width = 0.4
-    x = np.arange(len(shapes_jax))
-
+    x = np.arange(len(backends))
+    # x = np.arange(len(shapes_jax))
     #plt.bar(x, mean_time_jax, width=bar_width, color=colors) # Uncomment this line to plot times/backend
 
-    plt.bar(x - bar_width / 2, mean_time_jax, width=bar_width, label='With compilation')
-    plt.bar(x + bar_width / 2, mean_time2_jax, width=bar_width, label="Without compilation") # Uncomment these lines to compare
+    plt.bar(x - bar_width / 2, mean_times, width=bar_width, label='float64')
+    plt.bar(x + bar_width / 2, mean_times2, width=bar_width, label="float32") # Uncomment these lines to compare
 
-
-    plt.xlabel('Shapes')
+    plt.xlabel('Backends')
     plt.ylabel('Time (seconds)')
-    plt.title(f'Iteration step time JAX 50x50 vs 400x400')
-    plt.xticks(x, shapes_jax, fontsize=6, rotation=45)
+    plt.title(f'Iteration step time data type')
+    plt.xticks(x, backends, fontsize=6, rotation=45)
     plt.legend()
 
     plt.show()
