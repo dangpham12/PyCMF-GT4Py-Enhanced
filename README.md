@@ -1,14 +1,17 @@
-# PyCMF with GT4Py
+# PyCMF with GT4Py-Enhanced
 
 ## Objectives
 
-This project is based on a previous work called PyCMF which aimed to experiment Object-Oriented technology and the use of Python in a Climate Modelling context. It concluded that OO brings a lot of flexibility and modularity to the code, but that it is not the best choice for performance. This project aims to improve the performance of the PyCMF framework by using GT4Py, a library that allows to generate high-performance code for stencil computations on structured grids. This project aimed to keep as much as possible the original structure of PyCMF, while adding the GT4Py code generation for the most performance-critical parts of the code. We will see that the performance of the code is greatly improved, but that the OO structure of PyCMF had to be adapted to the GT4Py code generation especially for the grid modelisation.
+This project is based on previous works called **PyCMF** and **PyCMF-GT4Py** which were done by **Nathan Marotte** and **Matthias Van der Cam** respectively, which aimed to experiment Object-Oriented technology and the use of Python in a Climate Modelling context.
+It concluded that OO brings a lot of flexibility and modularity to the code, but that it is not the best choice for performance. 
+Moreover, the GT4Py improves drastically the performance while being portable for all architectures.
+All visualisation implementations were abandoned.
 
-The graphical interface of PyCMF has not been ported to this version, as it was not the main focus of this project.
+The goal with this project is to improve the current PyCMF-GT4Py framework by  either reducing the overall execution time by lowering the compilation time of the stencils, or by improving the performance of the stencils themselves.
 
 ## Introduction
 
-Python Climate Modelling Framework (or PyCMF for short) is a framework developped by Nathan Marotte as part of his Master's thesis at the Université Libre de Bruxelles. 
+Python Climate Modelling Framework (or **PyCMF** for short) is a framework developped by Nathan Marotte as part of his Master's thesis at the Université Libre de Bruxelles. 
 
 - base_class (earth_base, sun_base, etc ...) and inheriting from BaseModel : Contains the basic
   structural/pythonic stuff for the class (correct inheritance, redefinition of dunder methods, etc ...)
@@ -21,17 +24,35 @@ Python Climate Modelling Framework (or PyCMF for short) is a framework developpe
 The framework is currently **not** able to provide accurate simulations of real-world physical process, but provides a
 few examples with placeholder simulations such as the averaging of the temperature at each time step
 
+
+**PyCMF-GT4Py** was a project that aimed to use the GT4Py library to generate stencils for the models. 
+- Stencils methods were defined with @gtscript.stencil decorator,
+- Practical functions only used in those stencils were defined with @gtscript.function decorator
+- Parallelization was done with the `with computation(keyword), interval(...)`, horizontal plane is already parallelized but the interval could be determined. 
+`keyword` could take the values of `PARALLEL`, `FORWARD`, `BACKWARD`.
+
+## Structure of the code
+No compilation flags or any influence on the internal transformations already auto-optimized were found.
+Yet, we found two tunings provided in one of the report of the developers that could improve the performance of the stencils:
+- `device_sync`: set to True by default, it ensures that the CPU waits for the GPU computations to finish before continuing. 
+Setting it to False can improve performance drastically, as long as we are sure that no dependencies are to be found. This only can be used on `gt:gpu`, `dace:gpu`, `cuda` (CUDA is deprecated for GT4Py > 1.0.3).
+- Reducing the precision of the data types used in the stencils, such as using `float32` instead of `float64`.
+
+A `DTYPE_ACCURACY` variable is defined in constants.py to allow for easy change of the data type used in the stencils.
+
+This implementation actually poorly differs from the previous PyCMF-GT4Py, as those 2 parameters for tunings are quite simple to implement.
+
 ## Running the code
 
 ### Required Libraries
 
-- numpy for the models
-- GT4Py for the stencils generation
-
+- **NumPy** for the models
+- **GT4Py** for the stencils generation
+- **CUDA** for the GPU backend
+- **DaCE** for the DaCe backends
+- **CuPy** for GPU-accelerated array operations
 
 To run the framework, you can edit the script in `main.py` and then execute it with `python3.11 src/main.py`.
-
-
 
 ## How to add a new model
 
